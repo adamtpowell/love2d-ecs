@@ -417,38 +417,7 @@ end
 -- Forward declaration
 local worldMetaTable
 
---- Creates a new World.
--- Can optionally add default Systems and Entities. Returns the new World along
--- with default Entities and Systems.
-function tiny.world(...)
-    local ret = setmetatable({
 
-        -- List of Entities to remove
-        entitiesToRemove = {},
-
-        -- List of Entities to change
-        entitiesToChange = {},
-
-        -- List of Entities to add
-        systemsToAdd = {},
-
-        -- List of Entities to remove
-        systemsToRemove = {},
-
-        -- Set of Entities
-        entities = {},
-
-        -- List of Systems
-        systems = {}
-
-    }, worldMetaTable)
-
-    tiny_add(ret, ...)
-    tiny_manageSystems(ret)
-    tiny_manageEntities(ret)
-
-    return ret, ...
-end
 
 --- Adds an Entity to the world.
 -- Also call this on Entities that have changed Components such that they
@@ -612,13 +581,15 @@ end
 -- Adds, removes, and changes Entities that have been marked.
 function tiny_manageEntities(world)
 
-    local e2r = world.entitiesToRemove
-    local e2c = world.entitiesToChange
+    local entitiesToRemove = world.entitiesToRemove
+    local entitiesToChange = world.entitiesToChange
 
     -- Early exit
-    if #e2r == 0 and #e2c == 0 then
+    if #entitiesToRemove == 0 and #entitiesToChange == 0 then
         return
     end
+
+    print("Changes required")
 
     world.entitiesToChange = {}
     world.entitiesToRemove = {}
@@ -627,10 +598,11 @@ function tiny_manageEntities(world)
     local systems = world.systems
 
     -- Change Entities
-    for i = 1, #e2c do
-        local entity = e2c[i]
+    for i = 1, #entitiesToChange do
+        local entity = entitiesToChange[i]
         -- Add if needed
         if not entities[entity] then
+            entity._world = world
             local index = #entities + 1
             entities[entity] = index
             entities[index] = entity
@@ -664,13 +636,13 @@ function tiny_manageEntities(world)
                 end
             end
         end
-        e2c[i] = nil
+        entitiesToChange[i] = nil
     end
 
     -- Remove Entities
-    for i = 1, #e2r do
-        local entity = e2r[i]
-        e2r[i] = nil
+    for i = 1, #entitiesToRemove do
+        local entity = entitiesToRemove[i]
+        entitiesToRemove[i] = nil
         local listIndex = entities[entity]
         if listIndex then
             -- Remove Entity from world state
@@ -751,6 +723,7 @@ function tiny.update(world, dt, filter)
 
     --  Iterate through Systems IN ORDER
     for i = 1, #systems do
+        -- Moving manageSystems and manageEntities here allows you to change components anywhere, as long as you call addEntitiy. TODO: Add utility funtion for adding and removing components.
         tiny_manageSystems(world)
         tiny_manageEntities(world)
         local system = systems[i]
@@ -836,12 +809,47 @@ function tiny.setSystemIndex(world, system, index)
     return oldIndex
 end
 
--- Construct world metatable.
-worldMetaTable = {
-    __index = {
+
+function tiny.addComponent(entity, componentName, component)
+    entity[componentName] = component
+    tiny.addEntity(entity._world, entity)
+end
+
+function tiny.removeComponent(entity, componentName)
+    entity[componentName] = nil
+    tiny.addEntity(entity._world, entity)
+end
+
+--- Creates a new World.
+-- Can optionally add default Systems and Entities. Returns the new World along
+-- with default Entities and Systems.
+function tiny.world(...)
+    local ret = setmetatable({
+
+        -- List of Entities to remove
+        entitiesToRemove = {},
+
+        -- List of Entities to change
+        entitiesToChange = {},
+
+        -- List of Entities to add
+        systemsToAdd = {},
+
+        -- List of Entities to remove
+        systemsToRemove = {},
+
+        -- Set of Entities
+        entities = {},
+
+        -- List of Systems
+        systems = {},
+
+        -- OO style aliases of tiny functions.
         add = tiny.add,
         addEntity = tiny.addEntity,
         addSystem = tiny.addSystem,
+        addComponent = tiny.addComponent,
+        removeComponent = tiny.removeComponent,
         remove = tiny.remove,
         removeEntity = tiny.removeEntity,
         removeSystem = tiny.removeSystem,
@@ -852,7 +860,18 @@ worldMetaTable = {
         getEntityCount = tiny.getEntityCount,
         getSystemCount = tiny.getSystemCount,
         setSystemIndex = tiny.setSystemIndex
-    },
+
+    }, worldMetaTable)
+
+    tiny_add(ret, ...)
+    tiny_manageSystems(ret)
+    tiny_manageEntities(ret)
+
+    return ret, ...
+end
+
+-- Construct world metatable.
+worldMetaTable = {
     __tostring = function()
         return "<tiny-ecs_World>"
     end
