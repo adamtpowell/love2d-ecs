@@ -589,8 +589,6 @@ function tiny_manageEntities(world)
         return
     end
 
-    print("Changes required")
-
     world.entitiesToChange = {}
     world.entitiesToRemove = {}
 
