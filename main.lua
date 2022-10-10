@@ -9,8 +9,9 @@ function sysDrawBB:process(e, dt)
     love.graphics.rectangle("line", e.pos.x, e.pos.y, e.bb.width, e.bb.height)
 end
 
+world:refresh()
+
 function love.load()
-    world:refresh()
 
     world:addEntity({
         pos = {x = 0, y = 0},
