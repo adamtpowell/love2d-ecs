@@ -23,6 +23,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -- @author Calvin Rose
 -- @license MIT
 -- @copyright 2016
+
+local Signal
+local signalLoaded = pcall(function()
+    Signal = require("signal")
+end)
+
 local tiny = {}
 
 -- Local versions of standard lua functions
@@ -332,6 +338,37 @@ local function processingSystemUpdate(system, dt)
     end
 end
 
+-- Update function for all signal Systems.
+local function signalSystemUpdate(system, ...)
+    if system.preProcess then
+        system.preProcess(system, ...)
+    end
+
+    if system.process then
+        if system.nocache then
+            local entities = system.world.entities
+            local filter = system.filter
+            if filter then
+                for i = 1, #entities do
+                    local entity = entities[i]
+                    if filter(system, entity) then
+                        system.process(system, entity, ...)
+                    end
+                end
+            end
+        else
+            local entities = system.entities
+            for i = 1, #entities do
+                system.process(system, entities[i], ...)
+            end
+        end
+    end
+
+    if system.postProcess then
+        system.postProcess(system, ...)
+    end
+end
+
 -- Sorts Systems by a function system.sortDelegate(entity1, entity2) on modify.
 local function sortedSystemOnModify(system)
     local entities = system.entities
@@ -374,6 +411,31 @@ function tiny.processingSystem(table)
     table = table or {}
     table[systemTableKey] = true
     table.update = processingSystemUpdate
+    return table
+end
+
+-- Creates a system which acts like a processing system triggered by a signal. Whenever the signal is sent,
+-- the system updates in the same way a processing system would for a single frame
+-- Varargs are passed instead of dt, taken from the emitted signal
+function tiny.signalSystem(table, signal)
+    if not signalLoaded then
+        error("Signal library not loaded, signalSystem not available. Place hump.signal as signal.lua in the same directory as tiny.lua")
+    end
+
+    table = table or {}
+    table[systemTableKey] = true
+    table.update = nil -- Don't update by frame. This system only updates when it receives a signal
+    local signalFunction = function(...)
+        signalSystemUpdate(table, ...)
+    end
+    Signal.register(signal, signalFunction)
+
+    local removeFunction = function()
+        Signal.remove(signal, signalFunction)
+    end
+
+    table.onRemoveFromWorld = removeFunction
+
     return table
 end
 
