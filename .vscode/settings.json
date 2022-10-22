@@ -5,7 +5,6 @@
     ],
     "Lua.workspace.checkThirdParty": false,
     "Lua.diagnostics.globals": [
-        "Entity"
     ],
     "editor.autoClosingQuotes": "never",
     "editor.suggest.showKeywords": true,
